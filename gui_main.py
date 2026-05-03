@@ -31,7 +31,6 @@ class Team2_Bot:
             json.dump(self.data, f, ensure_ascii=False, indent=4)
 
     def respond(self, msg):
-        # [추가] 시각적 시간표 출력 신호 감지
         if any(x in msg for x in ["보여줘", "보여줄래", "찐 시간표", "내 시간표"]):
             return "SIGNAL_SHOW_VISUAL"
 
@@ -64,7 +63,7 @@ class Team2_Bot:
                 if k in msg: return f"📍 {k} 위치: {v}"
             return "정확한 건물명을 입력해주세요. (예: 공학관 어디야?)"
             
-        return "죄송해요, 잘 이해하지 못했어요. '식단', '날씨', '월요일 수업' 처럼 질문해 보세요!"
+        return "죄송해요, 그 말은 잘 이해하지 못했어요. 아래 가이드를 참고해 질문해주세요!"
 
 class ChatGUI:
     def __init__(self, root, bot):
@@ -82,7 +81,20 @@ class ChatGUI:
         tk.Button(f, text="전송", command=self.send, bg="#3498DB", fg="white", width=8).pack(side="left")
         tk.Button(root, text="📅 내 주간 시간표 한꺼번에 관리하기", command=self.open_batch_form, bg="#E67E22", fg="white", font=("맑은 고딕", 10, "bold")).pack(fill="x", padx=15, pady=5)
         
-        self.msg("시스템", "반갑습니다! 나만의 학사비서 챗봇입니다.\n'내 시간표 보여줘'라고 입력하면 이미지 형태의 시간표를 볼 수 있어요!")
+        # 첫 시작 가이드
+        self.show_guide()
+
+    def show_guide(self):
+        """사용자가 물어볼 수 있는 키워드를 요약해서 보여줍니다."""
+        guide = (
+            "💡 [학사비서 사용법]\n"
+            "• 학식/밥: 오늘의 학식 메뉴 확인\n"
+            "• 날씨: 현재 학교(안성) 날씨 확인\n"
+            "• 시간표/수업: 등록한 시간표 조회\n"
+            "• 위치/어디: 건물 위치 안내\n"
+            "• '내 시간표 보여줘': 이미지 시간표 출력"
+        )
+        self.msg("시스템", guide)
 
     def send(self, e=None):
         txt = self.ent.get().strip()
@@ -90,79 +102,49 @@ class ChatGUI:
             self.msg("나", txt); self.ent.delete(0, "end")
             response = self.bot.respond(txt)
             
-            # 시각적 시간표 신호일 경우 함수 실행
             if response == "SIGNAL_SHOW_VISUAL":
                 self.msg("챗봇", "요청하신 찐 시간표 이미지를 생성했습니다! 짜잔~ ✨")
                 self.show_visual_timetable()
             else:
                 self.msg("챗봇", response)
+            
+            # [추가] 답변이 끝날 때마다 가이드를 다시 보여줌
+            self.root.after(500, self.show_guide)
 
     def msg(self, sender, m):
         self.log.config(state='normal'); self.log.insert("end", f"[{sender}]: {m}\n\n")
         self.log.config(state='disabled'); self.log.yview("end")
 
-    # [추가] 찐 시간표 이미지 형태의 팝업창
     def show_visual_timetable(self):
-        win = tk.Toplevel(self.root)
-        win.title("나의 찐 시간표")
-        win.geometry("650x450")
-        win.configure(bg="#FDF6E3") # 레트로한 미색 배경
-
+        win = tk.Toplevel(self.root); win.title("나의 찐 시간표"); win.geometry("650x450"); win.configure(bg="#FDF6E3")
         tk.Label(win, text="시 간 표", font=("궁서", 35, "bold"), bg="#FDF6E3", fg="#333").pack(pady=20)
-
-        # 격자 프레임
-        table_frame = tk.Frame(win, bg="black", bd=2)
-        table_frame.pack(padx=30, pady=10, fill="both", expand=True)
-
+        table_frame = tk.Frame(win, bg="black", bd=2); table_frame.pack(padx=30, pady=10, fill="both", expand=True)
         days = list("월화수목금")
-        
-        # 헤더 레이아웃
         for i, day in enumerate(days):
-            lbl = tk.Label(table_frame, text=day, font=("맑은 고딕", 13, "bold"), 
-                           bg="#D7D7D7", fg="black", borderwidth=1, relief="solid", width=12, height=2)
-            lbl.grid(row=0, column=i, sticky="nsew")
-
-        # 데이터 레이아웃
+            tk.Label(table_frame, text=day, font=("맑은 고딕", 13, "bold"), bg="#D7D7D7", borderwidth=1, relief="solid", width=12, height=2).grid(row=0, column=i, sticky="nsew")
         for i, day in enumerate(days):
-            content = self.bot.data.get(day, "")
-            # 가독성을 위해 슬래시나 공백을 줄바꿈으로 변경
-            display_text = content.replace("/", "\n").replace(" ", "\n")
-            
-            lbl = tk.Label(table_frame, text=display_text, font=("맑은 고딕", 11), 
-                           bg="white", fg="black", borderwidth=1, relief="solid", 
-                           width=12, height=10, justify="center")
-            lbl.grid(row=1, column=i, sticky="nsew")
-
-        # 셀 간격 자동 조정
-        for i in range(5):
-            table_frame.grid_columnconfigure(i, weight=1)
+            content = self.bot.data.get(day, "").replace("/", "\n").replace(" ", "\n")
+            tk.Label(table_frame, text=content, font=("맑은 고딕", 11), bg="white", borderwidth=1, relief="solid", width=12, height=10, justify="center").grid(row=1, column=i, sticky="nsew")
+        for i in range(5): table_frame.grid_columnconfigure(i, weight=1)
 
     def open_batch_form(self):
-        win = tk.Toplevel(self.root); win.title("주간 시간표 일괄 관리"); win.geometry("380x480")
-        win.configure(bg="#F3F4F6")
-
+        win = tk.Toplevel(self.root); win.title("주간 시간표 일괄 관리"); win.geometry("380x480"); win.configure(bg="#F3F4F6")
         tk.Label(win, text="[ 월~금 시간표 수정 ]", font=("맑은 고딕", 12, "bold"), bg="#F3F4F6").pack(pady=15)
-        
         entry_widgets = {}
         for day in list("월화수목금"):
-            row = tk.Frame(win, bg="#F3F4F6")
-            row.pack(fill="x", padx=20, pady=5)
-            tk.Label(row, text=f"{day}요일", width=6, anchor="w", bg="#F3F4F6", font=("맑은 고딕", 10)).pack(side="left")
-            ent = tk.Entry(row, font=("맑은 고딕", 10))
-            ent.pack(side="left", fill="x", expand=True, padx=5)
-            ent.insert(0, self.bot.data.get(day, ""))
-            entry_widgets[day] = ent
-
+            row = tk.Frame(win, bg="#F3F4F6"); row.pack(fill="x", padx=20, pady=5)
+            tk.Label(row, text=f"{day}요일", width=6, bg="#F3F4F6").pack(side="left")
+            ent = tk.Entry(row); ent.pack(side="left", fill="x", expand=True, padx=5)
+            ent.insert(0, self.bot.data.get(day, "")); entry_widgets[day] = ent
         def save_all():
             new_data = {day: widget.get() for day, widget in entry_widgets.items()}
             self.bot.save_all_data(new_data)
             messagebox.showinfo("저장 완료", "주간 시간표가 모두 저장되었습니다!")
             self.msg("시스템", "전체 시간표가 업데이트 되었습니다.")
             win.destroy()
-
-        # 저장 버튼과 이미지 보기 버튼 배치
-        tk.Button(win, text="전체 저장하기", command=save_all, bg="#27AE60", fg="white", font=("맑은 고딕", 10, "bold"), height=2).pack(fill="x", padx=50, pady=15)
-        tk.Button(win, text="📊 현재 시간표 이미지로 보기", command=self.show_visual_timetable, bg="#3498DB", fg="white", font=("맑은 고딕", 10)).pack(fill="x", padx=50, pady=5)
+            self.show_guide() # 저장 후에도 가이드 표시
+        tk.Button(win, text="전체 저장하기", command=save_all, bg="#27AE60", fg="white", font=("", 10, "bold"), height=2).pack(fill="x", padx=50, pady=15)
+        tk.Button(win, text="📊 현재 시간표 이미지로 보기", command=self.show_visual_timetable, bg="#3498DB", fg="white").pack(fill="x", padx=50, pady=5)
 
 if __name__ == "__main__":
     root = tk.Tk()
